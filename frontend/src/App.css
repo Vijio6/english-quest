@@ -96,9 +96,51 @@ body {
   flex-direction: column;
 }
 
-.player-text .name {
+.name {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.85rem;
   font-weight: 700;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.name:hover {
+  color: var(--accent);
+}
+
+.edit-icon {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.username-edit-box {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.username-input {
+  background: #0f1523;
+  border: 1px solid var(--accent);
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  width: 110px;
+}
+
+.save-username-btn {
+  background: var(--accent);
+  color: #07090e;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .player-text .rank-tag {
@@ -706,4 +748,27 @@ body {
 .leaderboard-tbl td {
   padding: 1rem;
   border-bottom: 1px solid var(--border);
+}
+
+/* LOADING STATES */
+.loading-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 3rem;
+  text-align: center;
+}
+
+.pulse-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 1.5rem auto;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
