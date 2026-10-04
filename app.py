@@ -5,32 +5,41 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 from groq import Groq
+from database import init_db, get_connection
 
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-DB_NAME = "game.db"
-
-def get_connection():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Ensure database is primed on startup
+init_db()
 
 groq_api_key = os.getenv("GROQ_API_KEY")
 groq_client = Groq(api_key=groq_api_key) if groq_api_key else None
 
 @app.route("/api/questions", methods=["GET"])
 def get_questions():
-    difficulty = request.args.get("difficulty", "beginner").lower()
+    difficulty = request.args.get("difficulty", "beginner").lower().strip()
     conn = get_connection()
     cursor = conn.cursor()
+    
+    # Randomly select 5 questions from the 100 questions for this difficulty
     cursor.execute(
-        "SELECT id, difficulty, category, prompt, options, explanation FROM questions WHERE difficulty = ? ORDER BY RANDOM()",
+        "SELECT id, difficulty, category, prompt, options, explanation FROM questions WHERE LOWER(difficulty) = ? ORDER BY RANDOM() LIMIT 5",
         (difficulty,)
     )
     rows = cursor.fetchall()
+
+    # Fallback if DB was clean
+    if not rows or len(rows) < 5:
+        init_db()
+        cursor.execute(
+            "SELECT id, difficulty, category, prompt, options, explanation FROM questions WHERE LOWER(difficulty) = ? ORDER BY RANDOM() LIMIT 5",
+            (difficulty,)
+        )
+        rows = cursor.fetchall()
+
     conn.close()
 
     payload = [
@@ -65,7 +74,7 @@ def verify_answer():
         return jsonify({"error": "Question not found"}), 404
 
     correct_answer = row["correct_answer"]
-    is_correct = user_answer == correct_answer.lower()
+    is_correct = user_answer == correct_answer.strip().lower()
 
     return jsonify({
         "is_correct": is_correct,
@@ -81,39 +90,40 @@ def generate_ai_question():
     difficulty = request.args.get("difficulty", "beginner").lower()
     
     tier_guides = {
-        "beginner": "Focus on everyday A2/B1 vocabulary and basic present/past tense grammar.",
-        "intermediate": "Focus on B2/C1 vocabulary, phrasal verbs, idioms, and conditional grammar.",
-        "veteran": "Focus on GRE/SAT level C2 vocabulary, arcane words, inversion, and subjunctive grammar."
+        "beginner": "Focus on everyday vocabulary, simple anagrams, basic idioms, or synonyms/antonyms.",
+        "intermediate": "Focus on idioms, multi-letter anagrams, phrasal subtleties, or collegiate vocabulary.",
+        "veteran": "Focus on archaic, GRE/SAT grade lexicon, obscure anagrams, ancient etymological idioms, or subjunctive structures."
     }
     guide = tier_guides.get(difficulty, tier_guides["beginner"])
 
     prompt = f"""
-    Create one multiple-choice English question.
-    Difficulty Tier: {difficulty.upper()}.
+    Create one four-option multiple-choice English question.
+    Difficulty: {difficulty.upper()}.
     Guideline: {guide}
-    Output ONLY a JSON object matching this exact schema:
+    Categories can be: synonym, antonym, anagram, idiom, or vocabulary.
+    Return strictly JSON:
     {{
-      "category": "vocabulary",
+      "category": "idiom",
       "difficulty": "{difficulty}",
-      "prompt": "The question sentence",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correct_answer": "Option A",
-      "explanation": "Why this option is correct"
+      "prompt": "Question text here",
+      "options": ["Choice A", "Choice B", "Choice C", "Choice D"],
+      "correct_answer": "Choice A",
+      "explanation": "Why this answer is correct"
     }}
     """
 
     try:
         completion = groq_client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are a professional English linguist. Output only valid JSON."},
-                {"role": "user", "content": prompt},
+                {"role": "system", "content": "You are a master English linguist and quiz architect. Return valid JSON only."},
+                {"role": "user", "content": prompt}
             ],
             model="llama-3.3-70b-versatile",
             temperature=0.7,
             response_format={"type": "json_object"}
         )
         data = json.loads(completion.choices[0].message.content)
-        data["id"] = 999999  # Temporary ID for dynamically generated questions
+        data["id"] = 999999
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -139,7 +149,7 @@ def get_leaderboard():
         SELECT player_name, difficulty, score, streak, created_at 
         FROM scores 
         ORDER BY score DESC 
-        LIMIT 5
+        LIMIT 10
     """)
     rows = cursor.fetchall()
     conn.close()
