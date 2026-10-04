@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 
-const API_BASE = "http://127.0.0.1:5000/api";
+const API_BASE = "https://english-quest-g2mj.onrender.com/api";
 
 const DIFFICULTY_CONFIG = {
   beginner: {
